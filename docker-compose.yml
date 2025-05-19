@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Web scraping service
+  scraper:
+    build:
+      context: ./scraper
+      dockerfile: Dockerfile
+    volumes:
+      - ./scraper:/app
+      - ./data:/data
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/jobsearcher
+      - BRAVE_API_KEY=${BRAVE_API_KEY}
+      - CRAWL4AI_API_KEY=${CRAWL4AI_API_KEY}
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  # Data processing and LLM integration service
+  processor:
+    build:
+      context: ./processor
+      dockerfile: Dockerfile
+    volumes:
+      - ./processor:/app
+      - ./data:/data
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/jobsearcher
+      - LLM_API_KEY=${LLM_API_KEY}
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  # API service
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/jobsearcher
+    depends_on:
+      - mongodb
+      - processor
+    restart: unless-stopped
+
+  # PowerBI visualization service (embedded in web interface)
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    volumes:
+      - ./web:/app
+    environment:
+      - API_URL=http://api:8000
+      - POWERBI_EMBED_TOKEN=${POWERBI_EMBED_TOKEN}
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # MongoDB database
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
